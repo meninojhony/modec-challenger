@@ -91,6 +91,10 @@ const ContractsPage: React.FC = () => {
     setContractToDelete(contract)
   }
 
+  const handleView = (contract: Contract) => {
+    router.push(`/contracts/${contract.id}`)
+  }
+
   const handleDeleteConfirm = async () => {
     if (!contractToDelete) return
 
@@ -163,6 +167,7 @@ const ContractsPage: React.FC = () => {
             contracts={contracts}
             pagination={pagination}
             onSort={handleSort}
+            onView={handleView}
             onEdit={handleEdit}
             onDelete={handleDeleteClick}
           />

@@ -14,7 +14,17 @@ interface ContractFormProps {
   submitLabel?: string
 }
 
-type FormData = ContractCreateInput | ContractUpdateInput
+type FormData = {
+  contract_number: string
+  supplier: string
+  description: string
+  category_id: string
+  responsible: string
+  status: 'draft' | 'active' | 'suspended' | 'terminated' | 'expired'
+  value: string
+  start_date: string
+  end_date: string
+}
 
 const ContractForm: React.FC<ContractFormProps> = ({
   initialData,
@@ -39,10 +49,10 @@ const ContractForm: React.FC<ContractFormProps> = ({
       contract_number: initialData.contract_number,
       supplier: initialData.supplier,
       description: initialData.description,
-      category_id: initialData.category_id,
+      category_id: String(initialData.category_id),
       responsible: initialData.responsible,
       status: initialData.status,
-      value: initialData.value.toString(),
+      value: String(initialData.value),
       start_date: initialData.start_date,
       end_date: initialData.end_date
     } : {
