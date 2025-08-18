@@ -180,3 +180,24 @@ async def update_contract(
     Creates a change history record for tracking modifications.
     """
     return contract_service.update_contract(contract_id, contract_data)
+
+
+@router.delete("/{contract_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_contract(
+    contract_id: str,
+    contract_service: ContractService = Depends(get_contract_service),
+    _: bool = Depends(verify_delete_confirmation)
+):
+    """
+    Delete a contract and its associated change history.
+    
+    - **contract_id**: Unique contract identifier (UUID format)
+    - **confirmation**: Must be true to confirm deletion (add ?confirmation=true)
+    
+    This operation permanently removes the contract and all its change history.
+    This action cannot be undone.
+    
+    **Warning**: This is a destructive operation that will permanently delete
+    the contract and all associated data.
+    """
+    contract_service.delete_contract(contract_id)
