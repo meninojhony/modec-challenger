@@ -3,7 +3,7 @@ from typing import List
 
 from ...schemas.contract import (
     Category, CategoryCreate, CategoryUpdate,
-    Contract, ContractCreate, PaginatedResponse, ContractFilters, PaginationParams
+    Contract, ContractCreate, ContractUpdate, PaginatedResponse, ContractFilters, PaginationParams
 )
 from ...services.contract import CategoryService, ContractService
 from ..dependencies import (
@@ -154,3 +154,29 @@ async def create_contract(
     Returns the created contract with generated ID and timestamps.
     """
     return contract_service.create_contract(contract_data)
+
+
+@router.put("/{contract_id}", response_model=Contract)
+async def update_contract(
+    contract_id: str,
+    contract_data: ContractUpdate,
+    contract_service: ContractService = Depends(get_contract_service)
+) -> Contract:
+    """
+    Update an existing contract.
+    
+    - **contract_id**: Unique contract identifier (UUID format)
+    - **contract_number**: New contract number (optional, must be unique if provided)
+    - **supplier**: New supplier name (optional)
+    - **description**: New description (optional)
+    - **category_id**: New category ID (optional, must exist if provided)
+    - **responsible**: New responsible person (optional)
+    - **status**: New contract status (optional)
+    - **value**: New contract value (optional, must be non-negative)
+    - **start_date**: New start date (optional)
+    - **end_date**: New end date (optional, must be after start_date)
+    
+    Only provided fields will be updated. Returns the updated contract with new timestamps.
+    Creates a change history record for tracking modifications.
+    """
+    return contract_service.update_contract(contract_id, contract_data)
