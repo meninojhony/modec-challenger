@@ -4,7 +4,7 @@ import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, CheckCircle } from 'lucide-react'
-import { contractsAPI } from '@/lib/api'
+import { useContracts } from '@/hooks/useContracts'
 import { ContractCreateInput } from '@/lib/validations'
 import ContractForm from '@/components/contracts/ContractForm'
 import Alert from '@/components/ui/Alert'
@@ -12,38 +12,19 @@ import Button from '@/components/ui/Button'
 
 const CreateContractPage: React.FC = () => {
   const router = useRouter()
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { createContract, loading, error } = useContracts()
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: ContractCreateInput) => {
     try {
-      setLoading(true)
-      setError(null)
-      const contract = await contractsAPI.createContract(data)
+      const contract = await createContract(data)
       setSuccessMessage(`Contract ${contract.contract_number} created successfully!`)
       
       setTimeout(() => {
         router.push(`/contracts/${contract.id}`)
       }, 2000)
-    } catch (error: any) {
+    } catch (error) {
       console.error('Failed to create contract:', error)
-      
-      if (error.response?.data?.detail) {
-        // Handle Pydantic validation errors
-        if (Array.isArray(error.response.data.detail)) {
-          const errors = error.response.data.detail.map((err: any) => 
-            `${err.loc?.join(' → ') || 'Field'}: ${err.msg}`
-          ).join(', ')
-          setError(`Validation errors: ${errors}`)
-        } else {
-          setError(error.response.data.detail)
-        }
-      } else {
-        setError(error.response?.data?.message || error.message || 'Failed to create contract')
-      }
-    } finally {
-      setLoading(false)
     }
   }
 

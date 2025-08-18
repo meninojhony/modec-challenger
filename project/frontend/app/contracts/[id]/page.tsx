@@ -4,55 +4,63 @@ import React, { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Edit, Trash2, Clock, Building, Calendar, DollarSign, User, FileText } from 'lucide-react'
-import { useContracts } from '@/hooks/useContracts'
+import { Contract } from '@/lib/types'
+import { contractsAPI } from '@/lib/api'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import Button from '@/components/ui/Button'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import Alert from '@/components/ui/Alert'
 import StatusBadge from '@/components/ui/StatusBadge'
-import ContractHistory from '@/components/contracts/ContractHistory'
-import DeleteConfirmationModal from '@/components/contracts/DeleteConfirmationModal'
 
 const ContractDetailPage: React.FC = () => {
   const params = useParams()
   const router = useRouter()
   const contractId = params.id as string
   
-  const { selectedContract, loading, error, fetchContract, deleteContract } = useContracts()
-  const [activeTab, setActiveTab] = useState<'details' | 'history'>('details')
-  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [contract, setContract] = useState<Contract | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
 
   useEffect(() => {
-    if (contractId) {
-      fetchContract(contractId)
+    const fetchContract = async () => {
+      if (!contractId) return
+      
+      try {
+        setLoading(true)
+        setError(null)
+        const response = await contractsAPI.getContract(contractId)
+        setContract(response)
+      } catch (error: any) {
+        setError('Failed to fetch contract details')
+        console.error('Error fetching contract:', error)
+      } finally {
+        setLoading(false)
+      }
     }
+
+    fetchContract()
   }, [contractId])
 
   const handleEdit = () => {
     router.push(`/contracts/${contractId}/edit`)
   }
 
-  const handleDeleteClick = () => {
-    setShowDeleteModal(true)
-  }
-
-  const handleDeleteConfirm = async () => {
-    if (!selectedContract) return
-
-    try {
-      setDeleteLoading(true)
-      await deleteContract(selectedContract.id)
-      router.push('/contracts')
-    } catch (error) {
-      console.error('Failed to delete contract:', error)
-    } finally {
-      setDeleteLoading(false)
+  const handleDelete = async () => {
+    if (!contract) return
+    
+    if (confirm('Are you sure you want to delete this contract? This action cannot be undone.')) {
+      try {
+        setDeleteLoading(true)
+        await contractsAPI.deleteContract(contract.id)
+        router.push('/contracts')
+      } catch (error) {
+        console.error('Failed to delete contract:', error)
+        alert('Failed to delete contract. Please try again.')
+      } finally {
+        setDeleteLoading(false)
+      }
     }
-  }
-
-  const handleDeleteCancel = () => {
-    setShowDeleteModal(false)
   }
 
   if (loading) {
@@ -83,7 +91,7 @@ const ContractDetailPage: React.FC = () => {
     )
   }
 
-  if (!selectedContract) {
+  if (!contract) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Alert
@@ -102,8 +110,6 @@ const ContractDetailPage: React.FC = () => {
       </div>
     )
   }
-
-  const contract = selectedContract
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -126,40 +132,18 @@ const ContractDetailPage: React.FC = () => {
               <Edit className="h-4 w-4 mr-2" />
               Edit
             </Button>
-            <Button variant="error" onClick={handleDeleteClick}>
+            <Button variant="error" onClick={handleDelete} disabled={deleteLoading}>
               <Trash2 className="h-4 w-4 mr-2" />
-              Delete
+              {deleteLoading ? 'Deleting...' : 'Delete'}
             </Button>
           </div>
         </div>
       </div>
 
       <div className="mb-6">
-        <nav className="flex space-x-8">
-          <button
-            className={`py-2 px-1 border-b-2 font-medium text-sm ${
-              activeTab === 'details'
-                ? 'border-primary-500 text-primary-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
-            onClick={() => setActiveTab('details')}
-          >
-            Contract Details
-          </button>
-          <button
-            className={`py-2 px-1 border-b-2 font-medium text-sm ${
-              activeTab === 'history'
-                ? 'border-primary-500 text-primary-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
-            onClick={() => setActiveTab('history')}
-          >
-            Change History
-          </button>
-        </nav>
+        <h2 className="text-xl font-semibold text-gray-900">Contract Details</h2>
       </div>
 
-      {activeTab === 'details' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2">
             <div className="bg-white rounded-lg border border-gray-200 p-6">
@@ -283,22 +267,6 @@ const ContractDetailPage: React.FC = () => {
             </div>
           </div>
         </div>
-      )}
-
-      {activeTab === 'history' && (
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-6">Change History</h2>
-          <ContractHistory contractId={contractId} />
-        </div>
-      )}
-
-      <DeleteConfirmationModal
-        isOpen={showDeleteModal}
-        onClose={handleDeleteCancel}
-        onConfirm={handleDeleteConfirm}
-        contract={contract}
-        loading={deleteLoading}
-      />
     </div>
   )
 }

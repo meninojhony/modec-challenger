@@ -1,35 +1,17 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect } from 'react'
 import Link from 'next/link'
 import { FileText, TrendingUp, AlertTriangle, CheckCircle } from 'lucide-react'
+import { useContracts } from '@/hooks/useContracts'
 import Button from '@/components/ui/Button'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
-import Alert from '@/components/ui/Alert'
-import { contractsAPI } from '@/lib/api'
-import { Contract } from '@/lib/types'
 import { formatCurrency } from '@/lib/utils'
 
 const Dashboard: React.FC = () => {
-  const [contracts, setContracts] = useState<Contract[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { contracts, loading, fetchContracts } = useContracts()
 
   useEffect(() => {
-    const fetchContracts = async () => {
-      try {
-        setLoading(true)
-        setError(null)
-        const response = await contractsAPI.getContracts()
-        setContracts(response.items)
-      } catch (error: any) {
-        setError('Failed to fetch contracts')
-        console.error('Error fetching contracts:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
     fetchContracts()
   }, [])
 
@@ -42,7 +24,7 @@ const Dashboard: React.FC = () => {
       thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30)
       return endDate <= thirtyDaysFromNow && c.status === 'active'
     }).length,
-    totalValue: contracts.reduce((sum, c) => sum + parseFloat(c.value.toString()), 0),
+    totalValue: contracts.reduce((sum, c) => sum + parseFloat(c.value), 0),
   }
 
   if (loading) {
@@ -61,15 +43,6 @@ const Dashboard: React.FC = () => {
           Overview of your contract portfolio and key metrics
         </p>
       </div>
-
-      {error && (
-        <Alert
-          type="error"
-          title="Error"
-          message={error}
-          className="mb-6"
-        />
-      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <div className="bg-white rounded-lg border border-gray-200 p-6">

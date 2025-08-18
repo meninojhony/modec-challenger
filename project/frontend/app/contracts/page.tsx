@@ -1,67 +1,86 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Plus, Download } from 'lucide-react'
-import { useContracts, useContractFilters } from '@/hooks/useContracts'
+import { contractsAPI } from '@/lib/api'
 import { Contract, ContractFilters as ContractFiltersType } from '@/lib/types'
 import Button from '@/components/ui/Button'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import Alert from '@/components/ui/Alert'
-import Pagination from '@/components/ui/Pagination'
 import ContractFilters from '@/components/contracts/ContractFilters'
 import ContractTable from '@/components/contracts/ContractTable'
-import DeleteConfirmationModal from '@/components/contracts/DeleteConfirmationModal'
 
 const ContractsPage: React.FC = () => {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const {
-    contracts,
-    totalContracts,
-    currentPage,
-    totalPages,
-    loading,
-    error,
-    fetchContracts,
-    deleteContract,
-  } = useContracts()
-  
-  const { filters, pagination, updateFilters, updatePagination } = useContractFilters()
-  
-  const [contractToDelete, setContractToDelete] = useState<Contract | null>(null)
-  const [deleteLoading, setDeleteLoading] = useState(false)
+  const [contracts, setContracts] = useState<Contract[]>([])
+  const [totalContracts, setTotalContracts] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [filters, setFilters] = useState<ContractFiltersType>({})
+
+  const fetchContracts = async (newFilters?: ContractFiltersType) => {
+    try {
+      setLoading(true)
+      setError(null)
+      const filtersToUse = newFilters !== undefined ? newFilters : filters
+      const response = await contractsAPI.getContracts(filtersToUse)
+      setContracts(response.items)
+      setTotalContracts(response.total)
+    } catch (error: any) {
+      setError('Failed to fetch contracts')
+      console.error('Error fetching contracts:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    const urlFilters: ContractFiltersType = {}
-    const urlParams = new URLSearchParams(searchParams.toString())
+    // Parse URL parameters and set initial filters
+    const initialFilters: ContractFiltersType = {}
     
-    urlParams.forEach((value, key) => {
-      if (value) {
-        if (key === 'category_id') {
-          const numValue = parseInt(value)
-          if (!isNaN(numValue)) {
-            urlFilters[key] = numValue
-          }
-        } else {
-          ;(urlFilters as any)[key] = value
-        }
-      }
-    })
-
-    if (Object.keys(urlFilters).length > 0) {
-      updateFilters(urlFilters)
+    if (searchParams.get('status')) {
+      initialFilters.status = searchParams.get('status') as any
     }
+    if (searchParams.get('supplier')) {
+      initialFilters.supplier = searchParams.get('supplier')!
+    }
+    if (searchParams.get('category_id')) {
+      initialFilters.category_id = parseInt(searchParams.get('category_id')!)
+    }
+    if (searchParams.get('min_value')) {
+      initialFilters.min_value = parseFloat(searchParams.get('min_value')!)
+    }
+    if (searchParams.get('max_value')) {
+      initialFilters.max_value = parseFloat(searchParams.get('max_value')!)
+    }
+    if (searchParams.get('q')) {
+      initialFilters.q = searchParams.get('q')!
+    }
+    if (searchParams.get('start_date_from')) {
+      initialFilters.start_date_from = searchParams.get('start_date_from')!
+    }
+    if (searchParams.get('start_date_to')) {
+      initialFilters.start_date_to = searchParams.get('start_date_to')!
+    }
+    if (searchParams.get('end_date_from')) {
+      initialFilters.end_date_from = searchParams.get('end_date_from')!
+    }
+    if (searchParams.get('end_date_to')) {
+      initialFilters.end_date_to = searchParams.get('end_date_to')!
+    }
+
+    setFilters(initialFilters)
+    fetchContracts(initialFilters)
   }, [searchParams])
 
-  useEffect(() => {
-    fetchContracts(filters, pagination)
-  }, [filters, pagination])
-
   const handleFiltersChange = (newFilters: ContractFiltersType) => {
-    updateFilters(newFilters)
+    setFilters(newFilters)
+    fetchContracts(newFilters)
     
+    // Update URL
     const params = new URLSearchParams()
     Object.entries(newFilters).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
@@ -74,40 +93,51 @@ const ContractsPage: React.FC = () => {
     router.replace(newUrl, { scroll: false })
   }
 
-  const handlePageChange = (page: number) => {
-    updatePagination({ page })
+  const handleSort = (field: string) => {
+    // Simple sorting implementation - can be enhanced later
+    console.log('Sort by:', field)
   }
 
-  const handleSort = (field: string) => {
-    const newSortDir = pagination.sort_by === field && pagination.sort_dir === 'asc' ? 'desc' : 'asc'
-    updatePagination({ sort_by: field, sort_dir: newSortDir })
+  const handleView = (contract: Contract) => {
+    router.push(`/contracts/${contract.id}`)
   }
 
   const handleEdit = (contract: Contract) => {
     router.push(`/contracts/${contract.id}/edit`)
   }
 
-  const handleDeleteClick = (contract: Contract) => {
-    setContractToDelete(contract)
-  }
-
-  const handleDeleteConfirm = async () => {
-    if (!contractToDelete) return
-
-    try {
-      setDeleteLoading(true)
-      await deleteContract(contractToDelete.id)
-      setContractToDelete(null)
-      fetchContracts(filters, pagination)
-    } catch (error) {
-      console.error('Failed to delete contract:', error)
-    } finally {
-      setDeleteLoading(false)
+  const handleDelete = async (contract: Contract) => {
+    if (confirm(`Are you sure you want to delete contract "${contract.contract_number}"? This action cannot be undone.`)) {
+      try {
+        await contractsAPI.deleteContract(contract.id)
+        
+        // Remove the contract from the local state
+        setContracts(prevContracts => 
+          prevContracts.filter(c => c.id !== contract.id)
+        )
+        setTotalContracts(prev => prev - 1)
+        
+        // Show success message (optional)
+        alert('Contract deleted successfully!')
+        
+      } catch (error: any) {
+        console.error('Failed to delete contract:', error)
+        alert('Failed to delete contract. Please try again.')
+      }
     }
   }
 
-  const handleDeleteCancel = () => {
-    setContractToDelete(null)
+  if (error) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <Alert
+          type="error"
+          title="Error"
+          message={error}
+          className="mb-6"
+        />
+      </div>
+    )
   }
 
   return (
@@ -125,22 +155,13 @@ const ContractsPage: React.FC = () => {
             Export
           </Button>
           <Link href="/contracts/create">
-            <Button>
+            <Button variant="primary">
               <Plus className="h-4 w-4 mr-2" />
               New Contract
             </Button>
           </Link>
         </div>
       </div>
-
-      {error && (
-        <Alert
-          type="error"
-          title="Error"
-          message={error}
-          className="mb-6"
-        />
-      )}
 
       <ContractFilters
         onFiltersChange={handleFiltersChange}
@@ -159,36 +180,42 @@ const ContractsPage: React.FC = () => {
             </p>
           </div>
 
-          <ContractTable
-            contracts={contracts}
-            pagination={pagination}
-            onSort={handleSort}
-            onEdit={handleEdit}
-            onDelete={handleDeleteClick}
-          />
-
-          {totalPages > 1 && (
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={handlePageChange}
-              showInfo={true}
-              totalItems={totalContracts}
-              itemsPerPage={pagination.page_size}
+          {contracts.length === 0 ? (
+            <div className="text-center py-12 bg-white rounded-lg border">
+              <p className="text-gray-500">No contracts found</p>
+              {Object.keys(filters).length > 0 && (
+                <Button 
+                  variant="secondary" 
+                  size="sm" 
+                  className="mt-4"
+                  onClick={() => handleFiltersChange({})}
+                >
+                  Clear Filters
+                </Button>
+              )}
+            </div>
+          ) : (
+            <ContractTable
+              contracts={contracts}
+              pagination={{ page: 1, page_size: 10, sort_by: 'start_date', sort_dir: 'desc' }}
+              onSort={handleSort}
+              onView={handleView}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
             />
           )}
         </>
       )}
-
-      <DeleteConfirmationModal
-        isOpen={!!contractToDelete}
-        onClose={handleDeleteCancel}
-        onConfirm={handleDeleteConfirm}
-        contract={contractToDelete}
-        loading={deleteLoading}
-      />
     </div>
   )
 }
 
-export default ContractsPage
+function ContractsPageWrapper() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><LoadingSpinner size="lg" /></div>}>
+      <ContractsPage />
+    </Suspense>
+  )
+}
+
+export default ContractsPageWrapper
