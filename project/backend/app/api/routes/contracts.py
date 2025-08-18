@@ -3,7 +3,7 @@ from typing import List
 
 from ...schemas.contract import (
     Category, CategoryCreate, CategoryUpdate,
-    Contract, PaginatedResponse, ContractFilters, PaginationParams
+    Contract, ContractCreate, PaginatedResponse, ContractFilters, PaginationParams
 )
 from ...services.contract import CategoryService, ContractService
 from ..dependencies import (
@@ -131,3 +131,26 @@ async def get_contract(
     Returns detailed contract information including category details.
     """
     return contract_service.get_contract(contract_id)
+
+
+@router.post("/", response_model=Contract, status_code=status.HTTP_201_CREATED)
+async def create_contract(
+    contract_data: ContractCreate,
+    contract_service: ContractService = Depends(get_contract_service)
+) -> Contract:
+    """
+    Create a new contract.
+    
+    - **contract_number**: Unique contract identifier
+    - **supplier**: Contract supplier/vendor name
+    - **description**: Contract description
+    - **category_id**: ID of the contract category (must exist)
+    - **responsible**: Person responsible for the contract
+    - **status**: Contract status (draft, active, suspended, terminated, expired)
+    - **value**: Contract value (must be non-negative)
+    - **start_date**: Contract start date (YYYY-MM-DD)
+    - **end_date**: Contract end date (must be after start_date)
+    
+    Returns the created contract with generated ID and timestamps.
+    """
+    return contract_service.create_contract(contract_data)
