@@ -1,9 +1,15 @@
 from fastapi import APIRouter, Depends, status
 from typing import List
 
-from ...schemas.contract import Category, CategoryCreate, CategoryUpdate
-from ...services.contract import CategoryService
-from ..dependencies import get_category_service, verify_delete_confirmation
+from ...schemas.contract import (
+    Category, CategoryCreate, CategoryUpdate,
+    Contract, PaginatedResponse, ContractFilters, PaginationParams
+)
+from ...services.contract import CategoryService, ContractService
+from ..dependencies import (
+    get_category_service, get_contract_service, verify_delete_confirmation,
+    get_pagination_params, get_contract_filters
+)
 
 # Category router
 category_router = APIRouter(prefix="/categories", tags=["categories"])
@@ -79,3 +85,49 @@ async def delete_category(
     Note: Cannot delete categories that have associated contracts.
     """
     category_service.delete_category(category_id)
+
+
+# Contracts router
+router = APIRouter(prefix="/contracts", tags=["contracts"])
+
+
+@router.get("/", response_model=PaginatedResponse)
+async def list_contracts(
+    filters: ContractFilters = Depends(get_contract_filters),
+    pagination: PaginationParams = Depends(get_pagination_params),
+    contract_service: ContractService = Depends(get_contract_service)
+) -> PaginatedResponse:
+    """
+    List contracts with filtering, search, and pagination.
+    
+    **Filters:**
+    - **supplier**: Filter by supplier name (partial match)
+    - **status**: Filter by contract status
+    - **category_id**: Filter by category ID
+    - **min_value/max_value**: Filter by value range
+    - **start_date_from/start_date_to**: Filter by start date range
+    - **end_date_from/end_date_to**: Filter by end date range
+    - **q**: Text search across contract_number, supplier, description, responsible
+    
+    **Pagination:**
+    - **page**: Page number (starts from 1)
+    - **page_size**: Items per page (max 10)
+    - **sort_by**: Field to sort by (start_date, end_date, created_at, etc.)
+    - **sort_dir**: Sort direction (asc/desc)
+    """
+    return contract_service.list_contracts(filters, pagination)
+
+
+@router.get("/{contract_id}", response_model=Contract)
+async def get_contract(
+    contract_id: str,
+    contract_service: ContractService = Depends(get_contract_service)
+) -> Contract:
+    """
+    Get a specific contract by ID.
+    
+    - **contract_id**: Unique contract identifier (UUID format)
+    
+    Returns detailed contract information including category details.
+    """
+    return contract_service.get_contract(contract_id)
